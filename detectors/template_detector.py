@@ -6,14 +6,15 @@ from imutils.object_detection import non_max_suppression
 
 
 class TemplateDetector(DetectorBase):
-    def __init__(self, method):
+    def __init__(self, threshold = 0.7, max_num = -100, method = cv2.TM_CCORR_NORMED):
         super(TemplateDetector, self).__init__("TemplateDetector")       
         
         if method in [cv2.TM_CCOEFF, cv2.TM_CCORR, cv2.TM_SQDIFF]:
             raise Exception("serch requires a normalized algorithm!")
 
         self._method = method
-        self._threshold = 0.95
+        self._threshold = threshold
+        self._max_num = max_num
 
     @property
     def threshold(self):
@@ -22,6 +23,14 @@ class TemplateDetector(DetectorBase):
     @threshold.setter
     def threshold(self, value):
         self._threshold = value
+
+    @property
+    def max_num(self):
+        return self._max_num
+
+    @max_num.setter
+    def max_num(self, value):
+        self._max_num = value
 
     def after_load(self, file : str):
         print(f'{self.name}.after_load()')
@@ -34,6 +43,10 @@ class TemplateDetector(DetectorBase):
             raise Exception("serch requires a normalized algorithm!")
 
         print(f'{self.name}.search()')
+        num_channels = len(image.shape)
+        if num_channels==2:
+            self._pattern = cv2.cvtColor(self._pattern, cv2.COLOR_BGR2GRAY)
+
         res = cv2.matchTemplate(image, self._pattern, self._method)
         if self._method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
             res = 1 - res
@@ -46,8 +59,13 @@ class TemplateDetector(DetectorBase):
         max_val = 1
         rects = []
 
+        ct = 0
         while max_val > threshold:
             min_val, max_val, min_loc, max_loc = cv2.minMaxLoc(res)
+            ct += 1
+
+            if ct > self._max_num:
+                break
 
             x, y = max_loc
             if max_val > threshold:
@@ -57,7 +75,7 @@ class TemplateDetector(DetectorBase):
                 w1 = np.clip(max_loc[0] - self._width//2, 0, img_width)
                 w2 = np.clip(max_loc[0] + self._width//2 + 1, 0, img_width)
                 res[h1:h2, w1:w2] = 0   
-                rects.append((x, y, x + self._width, y + self._height, max_val))
+                rects.append((int(x + self._width/2), int(y + self._height/2), self._width, self._height, max_val, 0))
 
         return np.array(rects)
 

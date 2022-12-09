@@ -1,4 +1,22 @@
 import numpy as np
+import pathlib
+import rawpy
+import cv2
+
+from processor.processor_base import *
+
+# Read an image in jpeg or raw format
+def imread(file : str, processor : ProcessorBase = None) -> np.array:
+	ext = pathlib.Path(file).suffix
+	if ext.lower()=='.cr2':
+		image : np.array = rawpy.imread(file).postprocess()
+	else:
+		image : np.array = cv2.imread(file)
+
+	if not processor is None:
+		image = processor.process(image)
+
+	return image
 
 # Nonmax Suppresssion algorithm (Malisiewicz et al.)
 # https://pyimagesearch.com/2015/02/16/faster-non-maximum-suppression-python/

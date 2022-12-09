@@ -1,0 +1,5 @@
+*.CR2
+*.jpg
+*.pyc
+*/__pycache__/*
+xxx/*
