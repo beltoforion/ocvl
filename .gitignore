@@ -1,5 +1,8 @@
 *.CR2
-*.jpg
 *.pyc
 */__pycache__/*
-xxx/*
+images/pano1/*
+images/pano2/*
+images/stack/*
+images/stack_moon/*
+*.xmp
