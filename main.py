@@ -1,3 +1,5 @@
+import sys
+
 from detectors.template_detector import *
 from detectors.keypoint_detector import *
 from detectors.blob_detector import *
@@ -9,6 +11,8 @@ from processor.agauss_thresh_processor import *
 from processor.greyscale_processor import *
 from processor.median_processor import *
 from processor.normalize_processor import *
+
+from matcher.icp_matcher import *
 
 from helper.opencv_helper import *
 from pathlib import Path
@@ -67,73 +71,6 @@ def keypoint_detect():
     cv2.imshow('found', buf)
     cv2.waitKey(0)
 
-
-def del_miss(indeces, dist, max_dist, th_rate = 0.8):
-    th_dist = max_dist * th_rate
-    return np.where(dist.T[0] < th_dist)
-#    return np.array([indeces[0][np.where(dist.T[0] < th_dist)]])
-
-
-def is_converge(Tr, scale):
-    delta_angle = 0.0001
-    delta_scale = scale * 0.0001
-    
-    min_cos = 1 - delta_angle
-    max_cos = 1 + delta_angle
-    min_sin = -delta_angle
-    max_sin = delta_angle
-    min_move = -delta_scale
-    max_move = delta_scale
-    
-    return min_cos < Tr[0, 0] and Tr[0, 0] < max_cos and \
-           min_cos < Tr[1, 1] and Tr[1, 1] < max_cos and \
-           min_sin < -Tr[1, 0] and -Tr[1, 0] < max_sin and \
-           min_sin < Tr[0, 1] and Tr[0, 1] < max_sin and \
-           min_move < Tr[0, 2] and Tr[0, 2] < max_move and \
-           min_move < Tr[1, 2] and Tr[1, 2] < max_move
-
-
-def icp(d1, d2, max_iterate = 100):
-    src = np.array([d1.T], copy=True).astype(np.float32)
-    dst = np.array([d2.T], copy=True).astype(np.float32)
-    
-    knn = cv2.ml.KNearest_create()
-    responses = np.array(range(len(d1[0]))).astype(np.float32)
-    knn.train(src[0], cv2.ml.ROW_SAMPLE, responses)
-        
-    trans = np.array([[1, 0, 0],
-                        [0, 1, 0],
-                        [0, 0, 1]])
-
-    max_dist = 10000000000000
-    scale_x = np.max(d1[0]) - np.min(d1[0])
-    scale_y = np.max(d1[1]) - np.min(d1[1])
-    scale = max(scale_x, scale_y)
-
-    for i in range(max_iterate):
-        ret, results, neighbours, dist = knn.findNearest(dst[0], 1)
-        
-        indeces = results.astype(np.int32).T     
-        keep_idx = del_miss(indeces, dist, max_dist)  
-        indeces = np.array([indeces[0][keep_idx]])       
-        dst = dst[0, keep_idx]
-
-        T, T2 = cv2.estimateAffinePartial2D(dst[0], src[0, indeces],  True, method=cv2.RANSAC, confidence=0.995, maxIters=2000)
-        if T is None:
-            print(f'{max_dist:0.1f};{dst.shape[1]}_', end = '')
-            break
-
-        max_dist = np.max(dist)
-        dst = cv2.transform(dst, T)
-        trans = np.dot(np.vstack((T,[0,0,1])), trans)
-
-        if (is_converge(T, scale)):
-            print(f'{max_dist:0.1f};{dst.shape[1]}_', end = '')
-            return trans
-
-        print('.', end = '')
-
-    return None
 
 def show_anot_images(ref_img_name, orig_image, ref_points, img_name, image, points, transform, windows_size = 1500):
     left_image = orig_image.copy()
@@ -198,10 +135,12 @@ def show_anot_images(ref_img_name, orig_image, ref_points, img_name, image, poin
     win_height, win_width = overview.shape[:2]
     text_x = 10
     text_y = 30
-    cv2.putText(overview, f'Reference: {ref_img_name}', (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
-    cv2.putText(overview, f'Current: {img_name}', ((win_width>>1) +  text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
-    cv2.putText(overview, f'Point Clouds', (text_x, (win_height>>1)+text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
-    cv2.putText(overview, f'Matched Results', ((win_width>>1) +  text_x, (win_height>>1)+text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, (0,255,0), 2, cv2.LINE_AA)
+    color = (255,255,255)
+    thickness = 1
+    cv2.putText(overview, f'Reference: {ref_img_name}', (text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness, cv2.LINE_AA)
+    cv2.putText(overview, f'Current: {img_name}', ((win_width>>1) +  text_x, text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness, cv2.LINE_AA)
+    cv2.putText(overview, f'Point Clouds', (text_x, (win_height>>1)+text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness, cv2.LINE_AA)
+    cv2.putText(overview, f'Matched Results', ((win_width>>1) +  text_x, (win_height>>1)+text_y), cv2.FONT_HERSHEY_SIMPLEX, 1, color, thickness, cv2.LINE_AA)
 
     cv2.imshow('Detection Result', overview)
     cv2.waitKey(1)
@@ -230,6 +169,10 @@ def align_stack(pathlist, ref_file : pathlib.Path, detector : DetectorBase, proc
     transform = None
     last_offset = np.array([0.0, 0.0])
     
+    matcher = IcpMatcher()
+    matcher.max_iterations = 100
+    matcher.median_threshold = 10
+
     for path in pathlist:
         if path.name == ref_file.name:
             continue
@@ -239,7 +182,9 @@ def align_stack(pathlist, ref_file : pathlib.Path, detector : DetectorBase, proc
         retry = 0
         while retry<2:
             try:
-                # Shift image by last offset
+                # Shift image by last offset. This makes the point cloud matching more 
+                # likely to succeed. Because images in a series are close to one another
+                # and if the last image could be matched the offset is almost correct.
                 image = shift_image(image, last_offset)
                 image_unprocessed = shift_image(image_unprocessed, last_offset)
 
@@ -248,24 +193,23 @@ def align_stack(pathlist, ref_file : pathlib.Path, detector : DetectorBase, proc
                 stars = detector.search(image)
                 points = np.array([(s[0], s[1]) for s in stars]).T
 
-                print(f'Image {ct} (fail={ct_fail}): {ref_file.name} - {path.name}: Matching', end = '')
+                print(f'Image {ct} (fail={ct_fail}): {ref_file.name} - {path.name}: ', end = '')
 
-                transform = icp(ref_points, points)
-                show_anot_images(ref_file.name, orig_image, ref_points, path.name, image, points, transform)
+                try:
+                    transform = matcher.match(ref_points, points)
+                    last_offset += transform[:2, 2]
+                    print(f'SUCCESS (dx={transform[0][2]:.1f}, dy={transform[1][2]:.1f})')
 
-                if transform is None:
-                    raise RuntimeError()
+                    t = transform[0:2]
+                    registered = cv2.warpAffine(image_unprocessed, t, (image_unprocessed.shape[1], image_unprocessed.shape[0]))            
+                    cv2.imwrite(f'./output/registered_{detector.name}_{ct}.jpg', registered)
+                finally:
+                    show_anot_images(ref_file.name, orig_image, ref_points, path.name, image, points, transform)
 
-                last_offset += transform[:2, 2] #(transform[0][2], transform[1][2])
-                print(f'SUCCESS (dx={transform[0][2]:.1f}, dy={transform[1][2]:.1f})')
-
-                t = transform[0:2]
-                registered = cv2.warpAffine(image_unprocessed, t, (image_unprocessed.shape[1], image_unprocessed.shape[0]))            
-                cv2.imwrite(f'./output/registered_{detector.name}_{ct}.jpg', registered)
                 break
 
-            except Exception as exc:
-                print(f'FAILED: {exc}')                    
+            except MatchException as exc:
+                print(exc)                    
                 retry += 1
                 ct_fail += 1
                 last_offset = np.array([0.0, 0.0])
