@@ -5,18 +5,26 @@ import cv2
 
 from processor.processor_base import *
 
+def shift_image(image, offset):
+    M = np.float32([[1, 0, offset[0]],
+	                [0, 1, offset[1]]])
+    shifted = cv2.warpAffine(image, M, (image.shape[1], image.shape[0]))            
+    return shifted
+	
 # Read an image in jpeg or raw format
-def imread(file : str, processor : ProcessorBase = None) -> np.array:
+def imread(file : str, processor : ProcessorBase = None):
 	ext = pathlib.Path(file).suffix
 	if ext.lower()=='.cr2':
 		image : np.array = rawpy.imread(file).postprocess()
 	else:
 		image : np.array = cv2.imread(file)
 
+	original_image = image.copy()
+
 	if not processor is None:
 		image = processor.process(image)
 
-	return image
+	return image, original_image
 
 # Nonmax Suppresssion algorithm (Malisiewicz et al.)
 # https://pyimagesearch.com/2015/02/16/faster-non-maximum-suppression-python/

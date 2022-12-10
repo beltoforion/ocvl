@@ -17,7 +17,7 @@ class BlobDetector(DetectorBase):
             params.filterByArea = True
             params.minArea = 2
             params.maxArea = 10000
-            params.filterByCircularity = True
+            params.filterByCircularity = False #True
             params.minCircularity = 0.8
             params.filterByConvexity = False
             params.filterByInertia = False
