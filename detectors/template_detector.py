@@ -42,7 +42,6 @@ class TemplateDetector(DetectorBase):
         if self._method in [cv2.TM_CCOEFF, cv2.TM_CCORR, cv2.TM_SQDIFF]:
             raise Exception("serch requires a normalized algorithm!")
 
-        print(f'{self.name}.search()')
         num_channels = len(image.shape)
         if num_channels==2:
             self._pattern = cv2.cvtColor(self._pattern, cv2.COLOR_BGR2GRAY)

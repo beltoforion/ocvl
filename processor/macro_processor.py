@@ -18,6 +18,6 @@ class MacroProcessor(ProcessorBase):
         for p in self._processors:
             image = p.process(image)
             ct += 1
-            cv2.imwrite(f'process_{ct}_{p.name}.jpg', image)
+#            cv2.imwrite(f'process_{ct}_{p.name}.jpg', image)
 
         return image            

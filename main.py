@@ -104,15 +104,15 @@ def icp(d1, d2, max_iterate = 100):
     responses = np.array(range(len(d1[0]))).astype(np.float32)
     knn.train(src[0], cv2.ml.ROW_SAMPLE, responses)
         
-    Tr = np.array([[1, 0, 0],
-                   [0, 1, 0],
-                   [0, 0, 1]])
+    trans = np.array([[1, 0, 0],
+                        [0, 1, 0],
+                        [0, 0, 1]])
 
     max_dist = 10000000000000
     scale_x = np.max(d1[0]) - np.min(d1[0])
     scale_y = np.max(d1[1]) - np.min(d1[1])
     scale = max(scale_x, scale_y)
-       
+
     for i in range(max_iterate):
         ret, results, neighbours, dist = knn.findNearest(dst[0], 1)
         
@@ -122,10 +122,13 @@ def icp(d1, d2, max_iterate = 100):
         dst = dst[0, keep_idx]
 
         T, T2 = cv2.estimateAffinePartial2D(dst[0], src[0, indeces],  True)
+        if T is None:
+            print(f'{max_dist:0.1f};{dst.shape[1]}_', end = '')
+            break
 
         max_dist = np.max(dist)
         dst = cv2.transform(dst, T)
-        Tr = np.dot(np.vstack((T,[0,0,1])), Tr)
+        trans = np.dot(np.vstack((T,[0,0,1])), trans)
 
 #        plt.plot(d1[0], d1[1], marker='o', linestyle = 'None')
 #        xxx = np.array([d2.T], copy=True).astype(np.float32)
@@ -134,10 +137,36 @@ def icp(d1, d2, max_iterate = 100):
 #        plt.show()
 
         if (is_converge(T, scale)):
-            break
+            print(f'{max_dist:0.1f};{dst.shape[1]}_', end = '')
+            return trans
 
-    return Tr[0:2]
+        print('.', end = '')
 
+    return None
+
+def build_comparison(orig_image, stars, size = 1500):
+    anot_image = orig_image.copy()
+
+    for pos in stars:
+        x, y, w, h, score, clid = pos
+        cv2.rectangle(anot_image, (int(x - w/2), int(y - h/2)), (int(x + w/2), int(y + h/2)), (0,255,0), 3)
+
+    overview = np.concatenate((orig_image, anot_image), axis=1)
+
+    h, w = overview.shape[:2]
+    scale = size / w
+    overview = cv2.resize(overview, (int(scale*w), int(scale*h)))
+
+    if len(overview.shape)==2:
+        overview = cv2.cvtColor(overview, cv2.COLOR_GRAY2BGR)    
+
+    return overview
+
+def shift_image(image, offset):
+    M = np.float32([[1, 0, offset[0]],
+	                [0, 1, offset[1]]])
+    shifted = cv2.warpAffine(image, M, (image.shape[1], image.shape[0]))            
+    return shifted
 
 def align_stack(pathlist, ref_file : pathlib.Path, detector : DetectorBase, process : ProcessorBase, show_original):
     ref_image = imread(str(ref_file), process)
@@ -162,51 +191,61 @@ def align_stack(pathlist, ref_file : pathlib.Path, detector : DetectorBase, proc
 
     print(f'Number of stars detected by {detector.name}: {len(stars)}')
 
-    for pos in stars:
-        x, y, w, h, score, clid = pos
-        cv2.rectangle(anot_image, (int(x - w/2), int(y - h/2)), (int(x + w/2), int(y + h/2)), (0,255,0), 3)
+    overview_ref = build_comparison(orig_image, stars)
+    
+    plt.ion()
 
-    overview = np.concatenate((orig_image, anot_image), axis=1)
-
-    h, w = overview.shape[:2]
-    scale = 1800.0 / w
-
-    overview = cv2.resize(overview, (int(scale*w), int(scale*h)))
-    if len(overview.shape)==2:
-        overview = cv2.cvtColor(overview, cv2.COLOR_GRAY2BGR)    
-
-    cv2.imshow('Detection Result', overview)
-    cv2.waitKey()
-
-#    cv2.imwrite("./align_image1.jpg", ref_image)
-
+    ct = 0
+    ct_fail = 0
+    transform = None
+    last_offset = np.array([0.0, 0.0])
     for path in pathlist:
         if path.name == ref_file.name:
             continue
 
-        print(f'{ref_file.name} - {path.name}')
-
+        image_unprocessed = imread(str(path))
         image = imread(str(path), process)
-        cv2.imwrite("./align_image2.jpg", image)
+
+        # Shift image by last offset
+        if not last_offset is None:
+            image = shift_image(image, last_offset)
+            image_unprocessed = shift_image(image_unprocessed, last_offset)
+
+        ct += 1
 
         stars = detector.search(image)
+
+        overview = build_comparison(image, stars)
+        overview = np.concatenate((overview_ref, overview), axis=0)
+        cv2.imshow('Detection Result', overview)
+        cv2.waitKey(100)
+
         points = np.array([(s[0], s[1]) for s in stars]).T
 
-#        blobs = detector.detect(image, None)
-#        points = np.array([point.pt for point in blobs], dtype="double").T
-
+        print(f'Image {ct} (fail={ct_fail}): {ref_file.name} - {path.name}: Starting ICP', end = '')
         transform = icp(ref_points, points)
-        print(transform[0][0] * transform[0][0] + transform[0][1] * transform[0][1])
-        print(np.arccos(transform[0][0]) / 2 / np.pi * 360)
-        print(np.arcsin(transform[0][1]) / 2 / np.pi * 360)
-        print(transform)
+        if transform is None:
+            last_offset = np.array([0.0, 0.0])
+            print('FAILED')                    
+            ct_fail += 1
+            continue
+        else:
+            last_offset += transform[:2, 2] #(transform[0][2], transform[1][2])
+            print(f'SUCCESS (dx={transform[0][2]:.1f}, dy={transform[1][2]:.1f})')
 
-        plt.clf()
-        plt.plot(ref_points[0], ref_points[1], marker='o', linestyle = 'None')
-        dst = np.array([points.T], copy=True).astype(np.float32)
-        dst = cv2.transform(dst, transform)
-        plt.plot(dst[0].T[0], dst[0].T[1], marker='+', linestyle = 'None')
-        plt.show()
+            t = transform[0:2]
+            registered = cv2.warpAffine(image_unprocessed, t, (image_unprocessed.shape[1], image_unprocessed.shape[0]))            
+            cv2.imwrite(f'./output/registered_{detector.name}_{ct}.jpg', registered)
+            
+            plt.clf()
+            plt.plot(ref_points[0], ref_points[1], marker='o', linestyle = 'None')
+            dst = np.array([points.T], copy=True).astype(np.float32)
+            dst = cv2.transform(dst, t)
+            plt.title(f'{ct}: {ref_file.name}-{path.name} ({transform[0][2]:.0f}x{transform[1][2]:.0f})')
+            plt.plot(dst[0].T[0], dst[0].T[1], marker='+', linestyle = 'None')
+            plt.draw()
+            plt.pause(0.0001)
+            plt.savefig(f'./output/match_{ct}.png')
 
 
 def stitch(pathlist):
@@ -259,8 +298,8 @@ def align_stars():
         process.add(MedianProcessor(5))
 
         detector = TemplateDetector(threshold = 0.1, max_num = 800)
-#        detector.load('./images/star.png')
-        detector.load('./images/pattern2.png')  
+        detector.load('./images/star.png')
+#        detector.load('./images/pattern2.png')  
         show_original = False
 
     elif method ==2:
@@ -274,7 +313,7 @@ def align_stars():
         detector = KeypointDetector()
         show_original = False        
 
-    path = Path('./images/stack')
+    path = Path('./images/stack_untracked')
     pathlist = path.glob('**/*.CR2')
     ref_image = path / 'IMG_8018.CR2'
     align_stack(pathlist, ref_image, detector, process, show_original)

@@ -31,7 +31,6 @@ class BlobDetector(DetectorBase):
         if image is None:
             raise Exception('Image is null!')
 
-        print(f'{self.name}.search()')
         blobs = self.detector.detect(image, None)
 
         # return format is array of 
