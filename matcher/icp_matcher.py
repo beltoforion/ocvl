@@ -3,12 +3,13 @@ import numpy as np
 import cv2
 
 from matcher.match_exception import *
+from matcher.matcher_base import MatcherBase
 
-
-class IcpMatcher:
-    def __init__(self):
-        self.__max_iterations = 100
-        self.__median_threshold = 5
+class IcpMatcher(MatcherBase):
+    def __init__(self, max_iterations = 100, median_threshold = 10):
+        super(IcpMatcher, self).__init__("IcpMatcher")      
+        self.__max_iterations = max_iterations
+        self.__median_threshold = median_threshold
 
     def __del_miss(self, dist, max_dist, th_rate = 0.8):
         th_dist = max_dist * th_rate
@@ -51,6 +52,7 @@ class IcpMatcher:
     @median_threshold.setter
     def median_threshold(self, value):
         self.__median_threshold = value
+
 
     def match(self, d1, d2):
         src = np.array([d1.T], copy=True).astype(np.float32)

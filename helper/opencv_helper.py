@@ -3,6 +3,7 @@ import pathlib
 import rawpy
 import cv2
 
+from typing import Union
 from processor.processor_base import *
 
 def shift_image(image, offset):
@@ -12,19 +13,48 @@ def shift_image(image, offset):
     return shifted
 	
 # Read an image in jpeg or raw format
-def imread(file : str, processor : ProcessorBase = None):
+def imread(file : str, processor : Union[ProcessorBase, list] = None):
 	ext = pathlib.Path(file).suffix
 	if ext.lower()=='.cr2':
-		image : np.array = rawpy.imread(file).postprocess()
+		image : np.array = rawpy.imread(file).postprocess() 
+
+#		image : np.array = rawpy.imread(file).postprocess(output_bps=16) 
+#		image = np.float32(image) # image.astype(np.float32)
+#		image = image / 65535.0
 	else:
 		image : np.array = cv2.imread(file)
 
 	original_image = image.copy()
 
-	if not processor is None:
+	if type(processor) is list:
+		for p in processor:
+			image = p.process(image)
+	elif type(processor) is ProcessorBase:
 		image = processor.process(image)
-
+	elif processor is None:
+		pass
+	
 	return image, original_image
+
+
+def improcess(image : np.array, processor : Union[ProcessorBase, list] = None):
+	if image is None:
+		raise RuntimeError('improcess: image must not be None!')
+
+	if processor is None:
+		raise RuntimeError('improcess: processor must not be None!')
+
+	processed_image = image.copy()
+
+	if type(processor) is list:
+		for p in processor:
+			processed_image = p.process(processed_image)
+	elif type(processor) is ProcessorBase:
+		processed_image = processor.process(processed_image)
+	elif processor is None:
+		pass
+	
+	return processed_image
 
 # Nonmax Suppresssion algorithm (Malisiewicz et al.)
 # https://pyimagesearch.com/2015/02/16/faster-non-maximum-suppression-python/

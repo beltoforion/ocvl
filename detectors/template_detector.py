@@ -33,7 +33,7 @@ class TemplateDetector(DetectorBase):
         self._max_num = value
 
     def after_load(self, file : str):
-        print(f'{self.name}.after_load()')
+        pass
 
     def search(self, image : np.array, threshold : float = None):
         if image is None:
@@ -45,6 +45,10 @@ class TemplateDetector(DetectorBase):
         num_channels = len(image.shape)
         if num_channels==2:
             self._pattern = cv2.cvtColor(self._pattern, cv2.COLOR_BGR2GRAY)
+
+        if image.dtype.name == 'float32' and self._pattern.dtype.name == 'uint8':
+            self._pattern = np.float32(self._pattern) 
+            self._pattern = self._pattern / 255.0
 
         res = cv2.matchTemplate(image, self._pattern, self._method)
         if self._method in [cv2.TM_SQDIFF, cv2.TM_SQDIFF_NORMED]:
