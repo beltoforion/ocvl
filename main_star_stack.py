@@ -1,21 +1,19 @@
-import sys
+from ocvl.detectors.template_detector import *
+from ocvl.detectors.keypoint_detector import *
+from ocvl.detectors.blob_detector import *
 
-from detectors.template_detector import *
-from detectors.keypoint_detector import *
-from detectors.blob_detector import *
+from ocvl.processor.scale_processor import *
+from ocvl.processor.macro_processor import *
+from ocvl.processor.ncc_processor import *
+from ocvl.processor.agauss_thresh_processor import *
+from ocvl.processor.greyscale_processor import *
+from ocvl.processor.median_processor import *
+from ocvl.processor.normalize_processor import *
 
-from processor.scale_processor import *
-from processor.macro_processor import *
-from processor.ncc_processor import *
-from processor.agauss_thresh_processor import *
-from processor.greyscale_processor import *
-from processor.median_processor import *
-from processor.normalize_processor import *
+from ocvl.matcher.icp_matcher import *
+from ocvl.matcher.brute_force_matcher import *
 
-from matcher.icp_matcher import *
-from matcher.brute_force_matcher import *
-
-from helper.opencv_helper import *
+from ocvl.helper.opencv_helper import *
 from pathlib import Path
 
 from StarStacker import *

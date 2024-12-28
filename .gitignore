@@ -9,3 +9,5 @@ images/stack_untracked/*
 images/stack_untracked2/*
 output/*
 .vs/*
+*/__pycache__/*.pyc
+

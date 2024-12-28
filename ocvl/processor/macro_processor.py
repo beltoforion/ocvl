@@ -1,6 +1,6 @@
-from processor.processor_base import ProcessorBase
+from ocvl.processor.processor_base import ProcessorBase
 import numpy as np
-import cv2
+
 
 class MacroProcessor(ProcessorBase):
     def __init__(self):
@@ -13,7 +13,7 @@ class MacroProcessor(ProcessorBase):
 
         self._processors.append(processor)
 
-    def process(self, image : np.array) -> np.array:
+    def process(self, image : np.ndarray) -> np.ndarray:
         ct = 0
         for p in self._processors:
             image = p.process(image)

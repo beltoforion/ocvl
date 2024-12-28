@@ -4,7 +4,8 @@ import rawpy
 import cv2
 
 from typing import Union
-from processor.processor_base import *
+from ocvl.processor.processor_base import *
+
 
 def shift_image(image, offset):
     M = np.float32([[1, 0, offset[0]],
@@ -13,16 +14,16 @@ def shift_image(image, offset):
     return shifted
 	
 # Read an image in jpeg or raw format
-def imread(file : str, processor : Union[ProcessorBase, list] = None):
+def imread(file : str, processor : Union[ProcessorBase, list] | None = None):
 	ext = pathlib.Path(file).suffix
 	if ext.lower()=='.cr2':
-		image : np.array = rawpy.imread(file).postprocess() 
+		image : np.ndarray = rawpy.imread(file).postprocess() 
 
 #		image : np.array = rawpy.imread(file).postprocess(output_bps=16) 
 #		image = np.float32(image) # image.astype(np.float32)
 #		image = image / 65535.0
 	else:
-		image : np.array = cv2.imread(file)
+		image : np.ndarray = cv2.imread(file)
 
 	original_image = image.copy()
 
@@ -37,7 +38,7 @@ def imread(file : str, processor : Union[ProcessorBase, list] = None):
 	return image, original_image
 
 
-def improcess(image : np.array, processor : Union[ProcessorBase, list] = None):
+def improcess(image : np.ndarray, processor : Union[ProcessorBase, list] | None = None):
 	if image is None:
 		raise RuntimeError('improcess: image must not be None!')
 

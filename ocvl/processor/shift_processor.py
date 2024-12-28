@@ -1,6 +1,7 @@
-from processor.processor_base import ProcessorBase
 import numpy as np
 import cv2
+
+from processor.processor_base import ProcessorBase
 
 
 class ShiftProcessor(ProcessorBase):
@@ -16,7 +17,7 @@ class ShiftProcessor(ProcessorBase):
     def offset(self, value):
         self.__offset = value.copy()
 
-    def process(self, image : np.array) -> np.array:
+    def process(self, image : np.ndarray) -> np.ndarray:
         M = np.float32([[1, 0, self.__offset[0]],
 	                    [0, 1, self.__offset[1]]])
         shifted = cv2.warpAffine(image, M, (image.shape[1], image.shape[0]))  

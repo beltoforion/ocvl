@@ -1,7 +1,7 @@
+import cv2
+
 from ocvl.processor.processor_base import ProcessorBase
 from ocvl.processor.input_output import *
-
-import cv2
 
 
 class ScaleProcessor(ProcessorBase):
@@ -9,7 +9,7 @@ class ScaleProcessor(ProcessorBase):
         super(ScaleProcessor, self).__init__("ScaleProcessor")      
         self.__interpolation = cv2.INTER_LINEAR
         self.__scale = -1
-        self.__target_size : tuple[float, float] | None = (1920, 1080)
+        self.__target_size = (1920, 1080)
 
         self._add_input(Input(self))
         self._add_output(Output())
@@ -27,7 +27,7 @@ class ScaleProcessor(ProcessorBase):
 
 
     @target_size.setter
-    def target_size(self, value : tuple[float, float]):
+    def target_size(self, value):
         """ Set target size of the scale transformation.
 
             You cannot specify a scale and a target size at the same time.

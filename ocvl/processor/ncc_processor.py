@@ -1,6 +1,7 @@
-from processor.processor_base import ProcessorBase
 import numpy as np
 import cv2
+
+from ocvl.processor.processor_base import ProcessorBase
 
 
 class NccProcessor(ProcessorBase):
@@ -9,7 +10,7 @@ class NccProcessor(ProcessorBase):
         self._pattern = cv2.imread(pattern_file)
         self._retain_size = retain_size
 
-    def process(self, image : np.array) -> np.array:
+    def process(self, image : np.ndarray) -> np.ndarray:
         res = cv2.matchTemplate(image, self._pattern, cv2.TM_CCORR_NORMED)
         res = res * 255
         res = cv2.normalize(res.astype(np.uint8), None, alpha=0, beta=255, norm_type=cv2.NORM_MINMAX) 
